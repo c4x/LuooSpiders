@@ -1,45 +1,47 @@
-# -*- coding: utf-8 -*-  
+# -*- coding: utf-8 -*-
 from scrapy.spider import BaseSpider
 from scrapy.selector import Selector
 from luooSpiders.items import luooSpidersItem
-import os
-import urllib    
+from scrapy.http import Request
 
-
-#curl -o 阿卡贝拉/01. Ciao, Bella, Ciao [Italy].mp3 http://luoo.waasaa.com/low/luoo/radio685/01.mp3
 class luooSpider(BaseSpider):
     name = "luoo"
     allowed_domains = ["luoo.net"]
-    start_urls = [
-        "http://www.luoo.net/music/700",
-    ]
+    start_urls = ['http://www.luoo.net/tag/?p=1']
 
-    # def callbackfunc(blocknum, blocksize, totalsize):
-    #     percent = 100 * blocknum * blocksize / totalsize
-    #     if percent >= 100:
-    #         percent = 100
-    #         print "%s%%"% str(percent)
+    def __init__(self, page=1, *args, **kwargs):
+        super(luooSpider, self).__init__(*args, **kwargs)
+        if page:
+            self.page = int(page)
 
     def parse(self, response):
-        item = luooSpidersItem()
+        print("current url:%s"%response.url)
+        periodicals = response.xpath('//a[@class="cover-wrapper"]/@href').extract()
+        last_page = int(max(response.xpath('//a[@class="page"]/text()').extract()))
+        for periodical in periodicals:
+            print("start periodical:%s"%periodical)
+            yield Request(periodical, callback=self.parse_item)
+        if self.page > last_page:
+            self.page = last_page
+        current = 1
+        while current <= self.page:
+            current += 1
+            yield Request('http://www.luoo.net/tag/?p=%s' % current, callback=self.parse)
+
+    def parse_item(self, response):
         special = response.url.split("/")[-1]
         container = Selector(response).xpath('/html/body/div[@class="container ct-sm"]')
-        item['title'] = container.xpath('h1[@class="vol-name"]/\
+        items = []
+        titles = container.xpath('h1[@class="vol-name"]/\
             span[@class="vol-title"]/text()').extract()
-        item['tracks'] = container.xpath('div[@class="vol-tracklist"]/ul/li[@class="track-item rounded"]/\
+        tracks = container.xpath('div[@class="vol-tracklist"]/ul/li[@class="track-item rounded"]/\
             div[@class="track-wrapper clearfix"]/a[@class="trackname btn-play"]/text()').extract()
-        if not os.path.isdir(item['title'][0].encode('utf8')) :
-            os.mkdir(item['title'][0].encode('utf8'))
-            pass
-        for index,track in enumerate(item['tracks']):
+        for index,track in enumerate(tracks):
+            item = luooSpidersItem()
             mp3_url = "http://luoo.waasaa.com/low/luoo/radio%s/%s.mp3"%(special,str(index+1).zfill(2))
-            path = item['title'][0].encode('utf8')+'/'+track.encode('utf8')[3:]+'.mp3'
-            urllib.urlretrieve(mp3_url, path)
-            # mp3 = open(path,'w')
-            # mp3.write(urllib.urlopen(mp3_url).read())
-            # mp3.close()
-            # print track.encode('utf8')[3:]
-            # os.system(cmd)
-            pass
-
-    
+            path = titles[0]+'/'+track[3:]+'.mp3'
+            item['title'] = titles[0]
+            item['url'] = mp3_url
+            item['path'] = path
+            items.append(item)
+        return items

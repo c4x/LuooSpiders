@@ -10,8 +10,9 @@
 
 BOT_NAME = 'luooSpiders'
 
-SPIDER_MODULES = ['luooSpiders.spiders']
+SPIDER_MODULES = ['luooSpiders.spiders',]
 NEWSPIDER_MODULE = 'luooSpiders.spiders'
+ITEM_PIPELINES={'luooSpiders.pipelines.LuoospidersPipeline':100,}
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'luooSpiders (+http://www.yourdomain.com)'
